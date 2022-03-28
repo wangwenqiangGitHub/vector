@@ -45,10 +45,7 @@ public:
 	//只想销毁对象，不能释放内存
 	~vector()
 	{
-		for(size_type k = 0; k < this->m_size; ++k)
-			this->m_data[k].~ValueT();
-		if(this->m_data)
-			::operator delete(this->m_data);
+		do_destruct();
 	}
 	// 复制构造
 	vector(const vector& rhs)
@@ -65,10 +62,11 @@ public:
 		}
 		}
 		catch(...){
-			for(::size_t k =0; k < this->m_size; ++k)
-				this->m_data[k].~ValueT();
-			::operator delete(this->m_data);
-			throw;
+			this->throw_erro(this->m_data, m_size);
+			/* for(::size_t k =0; k < this->m_size; ++k) */
+			/* 	this->m_data[k].~ValueT(); */
+			/* ::operator delete(this->m_data); */
+			/* throw; */
 		}
 
 	}
@@ -90,6 +88,19 @@ public:
 	vector&
 	operator=(vector&& rhs) noexcept; // TODO
 
+private:
+	void do_destruct() noexcept
+	{
+		this->clear();
+		::operator delete(this->m_data);
+	}
+	void throw_erro(ValueT* data, ::size_t size)
+	{
+		for(::size_t k =0; k < size; ++k)
+			this->m_data[k].~ValueT();
+		::operator delete(data);
+		throw;
+	}
 public:
 	//const 和非 const
 	iterator begin()noexcept
@@ -135,11 +146,10 @@ public:
 		return this->m_size == 0;
 	}
 
-	void clear() const noexcept
+	void clear() noexcept
 	{
 		for(::size_t k = 0; k < this->m_size; ++k)
 			this->m_data[k].~ValueT();
-
 		this->m_size = 0;
 	}
 	void pop_back() noexcept
@@ -192,16 +202,13 @@ public:
 				new_size += 1;
 		}
 		catch(...){
-			for(::size_t k =0; k < new_size; ++k)
-				this->m_data[k].~ValueT();
-			::operator delete(new_data);
-			throw;
+			this->throw_erro(new_data, new_size);
+			/* for(::size_t k =0; k < new_size; ++k) */
+			/* 	this->m_data[k].~ValueT(); */
+			/* ::operator delete(new_data); */
+			/* throw; */
 		}
-
-		for(::size_t k = 0; k < m_size; ++k)
-			this->m_data[k].~ValueT();
-		if(this->m_data)
-			::operator delete(this->m_data);
+		this->do_destruct();
 		this->m_data = new_data;
 		this->m_size =new_size;
 		this->m_capacity = new_cacpacity;
