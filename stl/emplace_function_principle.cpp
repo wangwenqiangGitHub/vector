@@ -1,11 +1,96 @@
+//=====================================================================
+//
+// emplace_function_principle.cpp - 
+// 理解stl的emplace的方法。手动实现emplace方法
+// Created by wwq on 2022/04/09
+// Last Modified: 2022/04/09 17:20:05
+//
+//=====================================================================
 #include <iostream>
 
-#include <vector>
+//#include <vector>
+
+// 手动实现emplace函数的功能
+// 内存分配器
+template<typename T>
+class MyAllocator
+{
+public:
+	// allocate deallocate方法是开辟内存和释放内存的。
+	
+	T* allocate(size_t size)
+	{
+		return (T*)malloc(size * sizeof(T));
+	}
+	//construct desctruct是在指定内存上去构造一个对象 析构只是析构对象，不释放内存
+	template<typename... Types>
+	void construct(T* ptr, Types&&... args)
+	{
+		//arg只是一个参数，而且是Test。需要知道T的构造是哪个。
+		new (ptr) T(std::forward<Types>(args)...);
+
+	}
+};
+
+template<typename T, typename Alloc = MyAllocator<T>>
+class vector
+{
+public:
+	vector():vec_(nullptr),size_(0), idx_(0){}
+
+	//预留内存空间
+	void reserve(size_t size)
+	{
+		vec_ = allocator_.allocate(size);
+		size_ = size;
+	}
+
+	//通过引用折叠实现这两种方法
+	
+#if 1
+	template<typename Type>
+	void push_back(Type&& val)
+	{
+		allocator_.construct(vec_ + idx_, std::forward<Type>(val));
+		idx_++;
+	}
+#else
+	// push_back
+	void push_back(const T& val)
+	{
+		allocator_.construct(vec_ + idx_ , val);
+		idx_++;
+	}
+	void push_back(const T&& val)
+	{
+		//右值引用
+		allocator_.construct(vec_ + idx_, std::move(val));
+		idx_++;
+	}
+#endif
+	//Types后面有两个引用表示：引用折叠
+	// Types&&...
+	// Test&+&& = Test& 左值引用
+	// Test && = 右值 根据实参的类型可以自动识别，这是引用折叠的特性。目的就是接口统一
+	// 变量本身是左值。
+	template<typename... Types>
+	void emplace_back(Types&&... args)
+	{
+		//不管是左值引用变量还是右值引用变量。传递过程重要保持args类型。
+		//采用std::forward()完美转发。
+		allocator_.construct(vec_ + idx_, std::forward<Types>(args)...);
+	}
+private:
+	T* vec_; //指向元素
+	int size_;//长度
+	int idx_;//元素格式
+	Alloc allocator_;//内存分配器
+};
+
 
 // c++11对 STL容器 push/insert外提供了emplace方法
 // std::move 移动， 右值引用&&
 // std::forword 完美转发
-
 class Test
 {
 public:
@@ -26,10 +111,11 @@ public:
 // emplace只需要传入对象所需要的构造的参数.
 int main()
 {
-// 对标准的stl库的vector进行测试
-// 分配固定大小，防止不够扩容了
+	// 对标准的stl库的vector进行测试
+	// 分配固定大小，防止不够扩容了
 	Test t1(10);
-	std::vector<Test> v;
+	/* std::vector<Test> v; */
+	vector<Test> v;
 	v.reserve(100);
 	std::cout << "============begin==================" << std::endl;
 	v.push_back(t1);
@@ -46,6 +132,6 @@ int main()
 	v.emplace_back(20);
 	v.emplace_back(30, 40);
 	std::cout << "============end  ==================" << std::endl;
-	
+
 	return 0; 
 }
